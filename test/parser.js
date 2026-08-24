@@ -107,6 +107,64 @@ describe("socket.io-parser", () => {
     }
   });
 
+  it("throws an error when receiving too many attachments", () => {
+    const decoder = new Decoder({ maxAttachments: 2 });
+
+    expect(() => {
+      decoder.add(
+        '53-["hello",{"_placeholder":true,"num":0},{"_placeholder":true,"num":1},{"_placeholder":true,"num":2}]'
+      );
+    }).to.throwException(/^too many attachments$/);
+
+    // at most 10 attachments per packet by default
+    expect(() => new Decoder().add('511-["hello"]')).to.throwException(
+      /^too many attachments$/
+    );
+
+    // a packet within the limit is still accepted
+    expect(() => new Decoder().add('510-["hello"]')).to.not.throwException();
+  });
+
+  it("decodes with a custom reviver", () => {
+    const decoder = new Decoder((key, value) => {
+      if (key === "a") {
+        return value.toUpperCase();
+      } else {
+        return value;
+      }
+    });
+
+    return new Promise((resolve) => {
+      decoder.on("decoded", (packet) => {
+        expect(packet.data).to.eql(["b", { a: "VAL" }]);
+        resolve();
+      });
+
+      decoder.add('2["b",{"a":"val"}]');
+    });
+  });
+
+  it("decodes with a custom reviver (options object)", () => {
+    const decoder = new Decoder({
+      reviver: (key, value) => {
+        if (key === "a") {
+          return value.toUpperCase();
+        } else {
+          return value;
+        }
+      },
+    });
+
+    return new Promise((resolve) => {
+      decoder.on("decoded", (packet) => {
+        expect(packet.data).to.eql(["b", { a: "VAL" }]);
+        resolve();
+      });
+
+      decoder.add('2["b",{"a":"val"}]');
+    });
+  });
+
   it("throw an error upon parsing error", () => {
     const isInvalidPayload = (str) =>
       expect(() => new Decoder().add(str)).to.throwException(
