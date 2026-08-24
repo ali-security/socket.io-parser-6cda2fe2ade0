@@ -56,6 +56,32 @@ describe("Buffer", () => {
     }).to.throwException(/^got binary data when not reconstructing a packet$/);
   });
 
+  it("throws an error when decoding a binary event with a zero attachment count", () => {
+    const decoder = new Decoder();
+
+    expect(() => {
+      decoder.add('50-["hello",{"_placeholder":true,"num":0}]');
+    }).to.throwException(/^Illegal attachments$/);
+
+    // the binary attachments that follow are not buffered indefinitely
+    expect(() => {
+      decoder.add(Buffer.from("world"));
+    }).to.throwException(/^got binary data when not reconstructing a packet$/);
+  });
+
+  it("throws an error when decoding a binary event with an unreachable attachment count", () => {
+    const decoder = new Decoder();
+
+    expect(() => {
+      decoder.add('5Infinity-["hello",{"_placeholder":true,"num":0}]');
+    }).to.throwException(/^Illegal attachments$/);
+
+    // the binary attachments that follow are not buffered indefinitely
+    expect(() => {
+      decoder.add(Buffer.from("world"));
+    }).to.throwException(/^got binary data when not reconstructing a packet$/);
+  });
+
   it("throws an error when decoding a binary event without attachments", () => {
     const decoder = new Decoder();
 

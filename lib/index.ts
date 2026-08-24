@@ -158,11 +158,6 @@ export class Decoder extends Emitter<{}, {}, DecoderReservedEvents> {
         packet.type = isBinaryEvent ? PacketType.EVENT : PacketType.ACK;
         // binary packet's json
         this.reconstructor = new BinaryReconstructor(packet);
-
-        // no attachments, labeled binary but no binary data to follow
-        if (packet.attachments === 0) {
-          super.emitReserved("decoded", packet);
-        }
       } else {
         // non-binary full packet
         super.emitReserved("decoded", packet);
@@ -212,7 +207,15 @@ export class Decoder extends Emitter<{}, {}, DecoderReservedEvents> {
       if (buf != Number(buf) || str.charAt(i) !== "-") {
         throw new Error("Illegal attachments");
       }
-      p.attachments = Number(buf);
+      const n = Number(buf);
+      // the number of attachments must be an integer greater than zero: packets
+      // without binary attachments should be encoded as EVENT or ACK packets,
+      // and a count which can never be reached (0, 1.5 or Infinity) would make
+      // the decoder buffer the incoming attachments indefinitely
+      if (!Number.isInteger(n) || n < 1) {
+        throw new Error("Illegal attachments");
+      }
+      p.attachments = n;
     }
 
     // look up namespace (if any)

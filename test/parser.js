@@ -131,6 +131,47 @@ describe("socket.io-parser", () => {
     );
   });
 
+  it("throws an error upon an invalid attachment count", () => {
+    const isInvalidAttachmentCount = (str) =>
+      expect(() => new Decoder().add(str)).to.throwException(
+        /^Illegal attachments$/
+      );
+
+    isInvalidAttachmentCount("5");
+    isInvalidAttachmentCount("51");
+    isInvalidAttachmentCount("5a-");
+    isInvalidAttachmentCount("51.23-");
+    isInvalidAttachmentCount("5Infinity-");
+
+    // a binary packet must have at least one attachment
+    isInvalidAttachmentCount("5-");
+    isInvalidAttachmentCount("50-");
+    isInvalidAttachmentCount("60-");
+    isInvalidAttachmentCount('50-["hello"]');
+    isInvalidAttachmentCount('50-["hello",{"_placeholder":true,"num":0}]');
+    isInvalidAttachmentCount('60-/admin,1["hello"]');
+  });
+
+  it("does not emit a decoded packet with unreconstructed attachments", () => {
+    const decoder = new Decoder();
+
+    let decodedPacket = null;
+    decoder.on("decoded", (packet) => {
+      decodedPacket = packet;
+    });
+
+    expect(() => {
+      decoder.add('50-["hello",{"_placeholder":true,"num":0}]');
+    }).to.throwException(/^Illegal attachments$/);
+
+    expect(decodedPacket).to.be(null);
+
+    // the decoder is not stuck waiting for attachments that will never come
+    decoder.add('2["hello"]');
+
+    expect(decodedPacket.data).to.eql(["hello"]);
+  });
+
   it("should resume decoding after calling destroy()", () => {
     return new Promise((resolve) => {
       const decoder = new Decoder();
